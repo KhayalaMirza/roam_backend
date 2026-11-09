@@ -1,0 +1,15 @@
+# Node
+node_modules/
+dist/
+coverage/
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+# OS
+.DS_Store
