@@ -18,6 +18,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     port: int(env.PORT, 3000),
     databaseUrl: env.DATABASE_URL ?? 'postgres://roam:roam@localhost:5432/roam',
     corsOrigins: list(env.CORS_ORIGINS),
+    /**
+     * Origin used to turn stored image paths (`/images/...`) into full URLs, e.g. https://api.roam.app.
+     * Empty => taken from each request (scheme + Host), so http://localhost:3000 locally.
+     */
+    publicBaseUrl: (env.PUBLIC_BASE_URL ?? '').replace(/\/+$/, ''),
     jwt: {
       secret: env.JWT_SECRET ?? 'dev-only-change-me-please-32-chars-min',
       accessTtlSeconds: int(env.JWT_ACCESS_TTL_SECONDS, 15 * 60),

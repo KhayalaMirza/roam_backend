@@ -6,6 +6,7 @@ import { loadConfig } from '../config/env';
 import { cities, countries, exchangeRates, places, regions, stays, tourCities, tours, users } from './schema';
 import * as schema from './schema';
 import { CITIES, COUNTRIES, PLACES, REGIONS, STAYS, TOURS } from './seed-data';
+import { CITY_IMAGES, COUNTRY_IMAGES, PLACE_IMAGES, STAY_IMAGES, TOUR_HERO_IMAGES } from './seed-images';
 
 /** Idempotent: upserts the starter catalog; never touches user data except creating the admin. */
 export async function seed(databaseUrl: string, opts: { adminEmail?: string; adminPassword?: string; log?: boolean } = {}) {
@@ -15,7 +16,10 @@ export async function seed(databaseUrl: string, opts: { adminEmail?: string; adm
   try {
     await db.transaction(async (tx) => {
       for (const r of REGIONS) await tx.insert(regions).values(r).onConflictDoUpdate({ target: regions.id, set: r });
-      for (const c of COUNTRIES) await tx.insert(countries).values(c).onConflictDoUpdate({ target: countries.id, set: c });
+      for (const country of COUNTRIES) {
+        const c = { ...country, imageUrl: COUNTRY_IMAGES[country.id] ?? null };
+        await tx.insert(countries).values(c).onConflictDoUpdate({ target: countries.id, set: c });
+      }
       for (const c of CITIES) {
         const [stay, food, transport, activities] = c.b;
         const v = {
@@ -30,20 +34,23 @@ export async function seed(databaseUrl: string, opts: { adminEmail?: string; adm
           transport: c.transport,
           lat: c.lat,
           lng: c.lng,
+          imageUrl: CITY_IMAGES[c.id] ?? null,
         };
         await tx.insert(cities).values(v).onConflictDoUpdate({ target: cities.id, set: v });
       }
       for (const [id, cityId, name, category, durationHours, priceAZN, lat, lng] of PLACES) {
-        const v = { id, cityId, name, category, durationHours, priceAZN, lat, lng };
+        const v = { id, cityId, name, category, durationHours, priceAZN, lat, lng, imageUrl: PLACE_IMAGES[id] ?? null };
         await tx.insert(places).values(v).onConflictDoUpdate({ target: places.id, set: v });
       }
       for (const [id, cityId, name, stars, pricePerNightAZN, lat, lng] of STAYS) {
-        const v = { id, cityId, name, stars, pricePerNightAZN, lat, lng, kind: 'Hotel' };
+        const v = { id, cityId, name, stars, pricePerNightAZN, lat, lng, kind: 'Hotel', imageUrl: STAY_IMAGES[id] ?? null };
         await tx.insert(stays).values(v).onConflictDoUpdate({ target: stays.id, set: v });
       }
       for (const t of TOURS) {
         const { cityIds, ...rest } = t;
-        const v = { ...rest, childPriceAZN: rest.childPriceAZN ?? null, operatorName: rest.operatorName ?? null, updatedAt: new Date() };
+        // Gallery: the tour's own cover first, then each of its cities' photos.
+        const images = [...new Set([TOUR_HERO_IMAGES[t.id], ...cityIds.map((id) => CITY_IMAGES[id])].filter((u): u is string => !!u))];
+        const v = { ...rest, images, childPriceAZN: rest.childPriceAZN ?? null, operatorName: rest.operatorName ?? null, updatedAt: new Date() };
         await tx.insert(tours).values(v).onConflictDoUpdate({ target: tours.id, set: v });
         await tx.delete(tourCities).where(sql`${tourCities.tourId} = ${t.id}`);
         await tx.insert(tourCities).values(cityIds.map((cityId, position) => ({ tourId: t.id, cityId, position })));

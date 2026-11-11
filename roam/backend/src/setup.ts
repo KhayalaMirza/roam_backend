@@ -2,6 +2,8 @@ import { INestApplication } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
+import { join } from 'path';
+import { AssetUrlInterceptor, IMAGES_PATH } from './common/asset-url.interceptor';
 import { createValidationPipe } from './common/validation';
 import { loadConfig } from './config/env';
 
@@ -15,6 +17,14 @@ export function configureApp(app: INestApplication) {
   app.enableCors({ origin: cfg.corsOrigins.length ? cfg.corsOrigins : false });
   app.setGlobalPrefix(API_PREFIX, { exclude: ['health'] });
   app.useGlobalPipes(createValidationPipe());
+  app.useGlobalInterceptors(new AssetUrlInterceptor(cfg.publicBaseUrl));
+  // Bundled catalog photos: GET /images/cities/cairo.jpg (outside the /v1 prefix, cached for a week).
+  (app as NestExpressApplication).useStaticAssets(join(__dirname, '..', 'public', 'images'), {
+    prefix: IMAGES_PATH,
+    maxAge: '7d',
+    // helmet defaults to same-origin; images may be embedded by other origins (e.g. a web admin panel).
+    setHeaders: (res) => res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin'),
+  });
   app.enableShutdownHooks();
   return app;
 }
